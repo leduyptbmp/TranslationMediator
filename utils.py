@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from telegram import Update
-from telegram.ext import CallbackContext
+from telegram.ext import ContextTypes
 import time
 
 class RateLimiter:
@@ -10,7 +10,7 @@ class RateLimiter:
         self.time_window = time_window
         self.requests = {}
 
-    def check_rate_limit(self, user_id: int) -> bool:
+    async def check_rate_limit(self, user_id: int) -> bool:
         current_time = time.time()
         user_requests = self.requests.get(user_id, [])
 
@@ -31,9 +31,9 @@ def setup_logging():
         level=logging.INFO
     )
 
-def send_error_message(update: Update, context: CallbackContext, message: str):
+async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
     try:
-        update.message.reply_text(f"⚠️ Error: {message}")
+        await update.message.reply_text(f"⚠️ Error: {message}")
     except Exception as e:
         logging.error(f"Failed to send error message: {str(e)}")
 

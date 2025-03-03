@@ -7,9 +7,6 @@ load_dotenv()
 # Telegram Bot Token
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', 'your-token-here')
 
-# Google Translate API Key
-GOOGLE_TRANSLATE_API_KEY = os.getenv('GOOGLE_TRANSLATE_API_KEY', 'your-api-key-here')
-
 # Rate limiting (messages per minute)
 RATE_LIMIT = 30
 

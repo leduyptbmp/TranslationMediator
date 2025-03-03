@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import CallbackContext
+from telegram.ext import ContextTypes
 from storage import Storage
 from translator import TranslationService
 from utils import RateLimiter, send_error_message, validate_channel_id
@@ -12,7 +12,7 @@ class CommandHandler:
         self.rate_limiter = RateLimiter(max_requests=30)
         self.logger = logging.getLogger(__name__)
 
-    def start(self, update: Update, context: CallbackContext):
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = update.effective_user.id
             welcome_message = (
@@ -25,75 +25,75 @@ class CommandHandler:
                 "/settings - Change translation settings\n"
                 "/help - Show this help message"
             )
-            update.message.reply_text(welcome_message)
+            await update.message.reply_text(welcome_message)
         except Exception as e:
             self.logger.error(f"Error in start command: {str(e)}")
-            send_error_message(update, context, "Failed to start bot")
+            await send_error_message(update, context, "Failed to start bot")
 
-    def help(self, update: Update, context: CallbackContext):
-        self.start(update, context)
+    async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await self.start(update, context)
 
-    def subscribe(self, update: Update, context: CallbackContext):
+    async def subscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = update.effective_user.id
 
-            if not self.rate_limiter.check_rate_limit(user_id):
-                send_error_message(update, context, "Rate limit exceeded. Please try again later.")
+            if not await self.rate_limiter.check_rate_limit(user_id):
+                await send_error_message(update, context, "Rate limit exceeded. Please try again later.")
                 return
 
             if not context.args or len(context.args) != 1:
-                update.message.reply_text("Please provide a channel ID: /subscribe @channel")
+                await update.message.reply_text("Please provide a channel ID: /subscribe @channel")
                 return
 
             channel_id = context.args[0]
             if not validate_channel_id(channel_id):
-                send_error_message(update, context, "Invalid channel ID format")
+                await send_error_message(update, context, "Invalid channel ID format")
                 return
 
             self.storage.add_channel_subscription(user_id, channel_id)
-            update.message.reply_text(f"✅ Successfully subscribed to {channel_id}")
+            await update.message.reply_text(f"✅ Successfully subscribed to {channel_id}")
 
         except Exception as e:
             self.logger.error(f"Error in subscribe command: {str(e)}")
-            send_error_message(update, context, "Failed to subscribe to channel")
+            await send_error_message(update, context, "Failed to subscribe to channel")
 
-    def unsubscribe(self, update: Update, context: CallbackContext):
+    async def unsubscribe(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = update.effective_user.id
 
             if not context.args or len(context.args) != 1:
-                update.message.reply_text("Please provide a channel ID: /unsubscribe @channel")
+                await update.message.reply_text("Please provide a channel ID: /unsubscribe @channel")
                 return
 
             channel_id = context.args[0]
             self.storage.remove_channel_subscription(user_id, channel_id)
-            update.message.reply_text(f"✅ Successfully unsubscribed from {channel_id}")
+            await update.message.reply_text(f"✅ Successfully unsubscribed from {channel_id}")
 
         except Exception as e:
             self.logger.error(f"Error in unsubscribe command: {str(e)}")
-            send_error_message(update, context, "Failed to unsubscribe from channel")
+            await send_error_message(update, context, "Failed to unsubscribe from channel")
 
-    def list_subscriptions(self, update: Update, context: CallbackContext):
+    async def list_subscriptions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = update.effective_user.id
             subscribed_channels = self.storage.get_subscribed_channels(user_id)
 
             if not subscribed_channels:
-                update.message.reply_text("You haven't subscribed to any channels yet.")
+                await update.message.reply_text("You haven't subscribed to any channels yet.")
                 return
 
             message = "Your subscribed channels:\n\n" + "\n".join(subscribed_channels)
-            update.message.reply_text(message)
+            await update.message.reply_text(message)
 
         except Exception as e:
             self.logger.error(f"Error in list command: {str(e)}")
-            send_error_message(update, context, "Failed to list subscriptions")
+            await send_error_message(update, context, "Failed to list subscriptions")
 
-    def handle_message(self, update: Update, context: CallbackContext):
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = update.effective_user.id
 
-            if not self.rate_limiter.check_rate_limit(user_id):
+            if not await self.rate_limiter.check_rate_limit(user_id):
                 return
 
             preferences = self.storage.get_user_preferences(user_id)
@@ -106,7 +106,7 @@ class CommandHandler:
             )
 
             if translated_text and translated_text != message_text:
-                update.message.reply_text(f"🔄 Translation:\n{translated_text}")
+                await update.message.reply_text(f"🔄 Translation:\n{translated_text}")
 
         except Exception as e:
             self.logger.error(f"Error in message handler: {str(e)}")
