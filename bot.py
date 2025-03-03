@@ -4,6 +4,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from config import TOKEN
 from handlers import CommandHandler as BotCommandHandler
 from utils import setup_logging
+from keep_alive import keep_alive
 
 # Apply nest_asyncio to allow nested event loops
 nest_asyncio.apply()
@@ -13,6 +14,9 @@ async def main():
     setup_logging()
     logger = logging.getLogger(__name__)
 
+    # Initialize keep-alive mechanism
+    keep_alive()
+    
     # Add immediate log messages to verify logging is working
     logger.info("=== Bot Starting ===")
     logger.info("Initializing Telegram bot...")
