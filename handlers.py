@@ -444,6 +444,15 @@ class CommandHandler:
         try:
             user_id = update.effective_user.id
             preferences = self.storage.get_user_preferences(user_id)
+            
+            # Language code to full name mapping
+            language_names = {
+                'vi': '🇻🇳 Tiếng Việt',
+                'en': '🇺🇸 English',
+                'ja': '🇯🇵 日本語',
+                'ko': '🇰🇷 한국어',
+                'zh': '🇨🇳 中文'
+            }
 
             # Create keyboard with language options
             keyboard = [
@@ -460,10 +469,14 @@ class CommandHandler:
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            # Get current language code and display full name
+            current_lang_code = preferences.get('target_language', 'en')
+            current_lang_name = language_names.get(current_lang_code, current_lang_code)
 
             settings_message = (
                 "⚙️ Cài đặt hiện tại / Current Settings:\n"
-                f"🔤 Ngôn ngữ dịch / Target Language: {preferences.get('target_language', 'en')}\n\n"
+                f"🔤 Ngôn ngữ dịch / Target Language: {current_lang_name}\n\n"
                 "Chọn ngôn ngữ mới / Select new language:"
             )
             await update.message.reply_text(settings_message, reply_markup=reply_markup)
@@ -544,14 +557,26 @@ class CommandHandler:
                     "❌ Mã ngôn ngữ không hợp lệ / Invalid language code"
                 )
                 return
+                
+            # Language code to full name mapping
+            language_names = {
+                'vi': '🇻🇳 Tiếng Việt',
+                'en': '🇺🇸 English',
+                'ja': '🇯🇵 日本語',
+                'ko': '🇰🇷 한국어',
+                'zh': '🇨🇳 中文'
+            }
+            
+            # Get full language name
+            language_name = language_names.get(new_language, new_language)
 
             preferences = self.storage.get_user_preferences(user_id)
             preferences['target_language'] = new_language
             self.storage.set_user_preferences(user_id, preferences)
 
             success_message = (
-                f"✅ Đã đổi ngôn ngữ dịch thành: {new_language}\n"
-                f"Target language successfully changed to: {new_language}"
+                f"✅ Đã đổi ngôn ngữ dịch thành: {language_name}\n"
+                f"Target language successfully changed to: {language_name}"
             )
             await query.edit_message_text(success_message)
 
