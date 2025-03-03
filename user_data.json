@@ -1,9 +1,7 @@
 {
     "7901097354": {
         "target_language": "vi",
-        "subscribed_channels": [
-            "@cryptonews"
-        ],
+        "subscribed_channels": [],
         "notifications_enabled": true
     }
 }
