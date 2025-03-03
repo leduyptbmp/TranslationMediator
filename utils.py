@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -26,17 +27,53 @@ class RateLimiter:
         return True
 
 def setup_logging():
-    logging.basicConfig(
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        level=logging.INFO
-    )
+    try:
+        # Create logs directory if it doesn't exist
+        logs_dir = 'logs'
+        os.makedirs(logs_dir, exist_ok=True)
+
+        # Configure logging format
+        log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        formatter = logging.Formatter(log_format)
+
+        # Set up file handler
+        file_handler = logging.FileHandler(os.path.join(logs_dir, 'telegram_bot.log'))
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.INFO)
+
+        # Set up console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(logging.INFO)
+
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+
+        # Remove any existing handlers to avoid duplicates
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+
+        root_logger.addHandler(file_handler)
+        root_logger.addHandler(console_handler)
+
+        # Set up specific loggers
+        for logger_name in ['translator', 'bot', 'handlers']:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.INFO)
+
+        logging.info("Logging setup completed successfully")
+
+    except Exception as e:
+        print(f"Error setting up logging: {str(e)}")
+        raise
+
+def validate_channel_id(channel_id: str) -> bool:
+    return (channel_id.startswith('@') and len(channel_id) > 1) or \
+           (channel_id.startswith('-100') and channel_id[4:].isdigit())
 
 async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
     try:
         await update.message.reply_text(f"⚠️ Error: {message}")
     except Exception as e:
         logging.error(f"Failed to send error message: {str(e)}")
-
-def validate_channel_id(channel_id: str) -> bool:
-    return (channel_id.startswith('@') and len(channel_id) > 1) or \
-           (channel_id.startswith('-100') and channel_id[4:].isdigit())

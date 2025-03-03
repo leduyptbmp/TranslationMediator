@@ -22,7 +22,8 @@ class CommandHandler:
                 "/subscribe @channel - Subscribe to a channel\n"
                 "/unsubscribe @channel - Unsubscribe from a channel\n"
                 "/list - Show your subscribed channels\n"
-                "/settings - Change translation settings\n"
+                "/settings - View and change translation settings\n"
+                "/set_language [code] - Change target language (e.g., /set_language vi)\n"
                 "/help - Show this help message"
             )
             await update.message.reply_text(welcome_message)
@@ -100,13 +101,82 @@ class CommandHandler:
             target_language = preferences.get('target_language', 'en')
 
             message_text = update.message.text
-            translated_text = self.translator.translate_text(
-                message_text,
-                target_lang=target_language
-            )
+            self.logger.info(f"Received message: {message_text[:50]}...")  # Log first 50 chars
 
-            if translated_text and translated_text != message_text:
-                await update.message.reply_text(f"🔄 Translation:\n{translated_text}")
+            # Detect source language first
+            detected_lang = self.translator.detect_language(message_text)
+            self.logger.info(f"Detected language: {detected_lang}")
+
+            if detected_lang and detected_lang != target_language:
+                translated_text = self.translator.translate_text(
+                    message_text,
+                    target_lang=target_language,
+                    source_lang=detected_lang
+                )
+
+                if translated_text and translated_text != message_text:
+                    await update.message.reply_text(
+                        f"🔄 Dịch / Translation:\n"
+                        f"({detected_lang} ➜ {target_language})\n\n"
+                        f"{message_text}\n"
+                        f"➜ {translated_text}"
+                    )
 
         except Exception as e:
             self.logger.error(f"Error in message handler: {str(e)}")
+            await send_error_message(update, context, "Xin lỗi, có lỗi xảy ra khi dịch / Sorry, there was an error translating")
+
+    async def settings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            user_id = update.effective_user.id
+            preferences = self.storage.get_user_preferences(user_id)
+
+            settings_message = (
+                "⚙️ Current Settings:\n"
+                f"🔤 Target Language: {preferences.get('target_language', 'en')}\n\n"
+                "To change target language, use:\n"
+                "/set_language [language_code]\n\n"
+                "Example: /set_language vi\n\n"
+                "Common language codes:\n"
+                "🇺🇸 en - English\n"
+                "🇻🇳 vi - Vietnamese\n"
+                "🇯🇵 ja - Japanese\n"
+                "🇰🇷 ko - Korean\n"
+                "🇨🇳 zh - Chinese"
+            )
+            await update.message.reply_text(settings_message)
+
+        except Exception as e:
+            self.logger.error(f"Error in settings command: {str(e)}")
+            await send_error_message(update, context, "Failed to show settings")
+
+    async def set_language(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            if not context.args or len(context.args) != 1:
+                await update.message.reply_text(
+                    "Please provide a language code: /set_language [language_code]\n"
+                    "Example: /set_language vi"
+                )
+                return
+
+            user_id = update.effective_user.id
+            new_language = context.args[0].lower()
+
+            if not self.translator._is_valid_language(new_language):
+                await update.message.reply_text(
+                    "❌ Invalid language code. Please use a valid language code.\n"
+                    "Example: en, vi, ja, ko, zh"
+                )
+                return
+
+            preferences = self.storage.get_user_preferences(user_id)
+            preferences['target_language'] = new_language
+            self.storage.set_user_preferences(user_id, preferences)
+
+            await update.message.reply_text(
+                f"✅ Target language successfully changed to: {new_language}"
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error in set_language command: {str(e)}")
+            await send_error_message(update, context, "Failed to change language")

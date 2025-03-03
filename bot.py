@@ -9,8 +9,12 @@ from utils import setup_logging
 nest_asyncio.apply()
 
 async def main():
+    # Initialize logging first
     setup_logging()
     logger = logging.getLogger(__name__)
+
+    # Add immediate log messages to verify logging is working
+    logger.info("=== Bot Starting ===")
     logger.info("Initializing Telegram bot...")
 
     try:
@@ -27,6 +31,8 @@ async def main():
         application.add_handler(CommandHandler("subscribe", handler.subscribe))
         application.add_handler(CommandHandler("unsubscribe", handler.unsubscribe))
         application.add_handler(CommandHandler("list", handler.list_subscriptions))
+        application.add_handler(CommandHandler("settings", handler.settings))
+        application.add_handler(CommandHandler("set_language", handler.set_language))
         logger.info("Command handlers registered successfully")
 
         # Register message handler
