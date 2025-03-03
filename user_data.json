@@ -1,7 +1,10 @@
 {
     "7901097354": {
         "target_language": "vi",
-        "subscribed_channels": [],
+        "subscribed_channels": [
+            "@cryptonews",
+            "@BinanceLiquidations"
+        ],
         "notifications_enabled": true
     }
 }
