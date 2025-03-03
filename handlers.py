@@ -312,42 +312,6 @@ class CommandHandler:
                     )
                     return
 
-                # Handle direct messages for translation
-                if update.message.text:
-                    user_id = update.effective_user.id
-                    if not await self.rate_limiter.check_rate_limit(user_id):
-                        self.logger.warning(f"Rate limit exceeded for user {user_id}")
-                        return
-
-                    preferences = self.storage.get_user_preferences(user_id)
-                    target_language = preferences.get('target_language', 'en')
-
-                    message_text = update.message.text
-                    self.logger.info(f"Received direct message: {message_text}")
-
-                    # Detect source language first
-                    self.logger.info("Attempting to detect language for message")
-                    detected_lang = self.translator.detect_language(message_text)
-                    self.logger.info(f"Detected language: {detected_lang}")
-
-                    if detected_lang and detected_lang != target_language:
-                        self.logger.info(f"Translating from {detected_lang} to {target_language}")
-                        translated_text = self.translator.translate_text(
-                            message_text,
-                            target_lang=target_language,
-                            source_lang=detected_lang
-                        )
-
-                        if translated_text and translated_text != message_text:
-                            await update.message.reply_text(
-                                f"🔄 Dịch / Translation:\n"
-                                f"({detected_lang} ➜ {target_language})\n\n"
-                                f"{message_text}\n"
-                                f"➜ {translated_text}"
-                            )
-                        else:
-                            self.logger.warning("Translation failed or returned same text")
-
             # Handle channel posts
             if update.channel_post:
                 channel_id = str(update.channel_post.chat.id)
@@ -394,6 +358,42 @@ class CommandHandler:
                                     self.logger.info(f"Successfully sent translated message to user {user_id}")
                                 except Exception as e:
                                     self.logger.error(f"Failed to send translation to user {user_id}: {str(e)}")
+
+            # Handle direct messages for translation
+            if update.message and update.message.text:
+                user_id = update.effective_user.id
+                if not await self.rate_limiter.check_rate_limit(user_id):
+                    self.logger.warning(f"Rate limit exceeded for user {user_id}")
+                    return
+
+                preferences = self.storage.get_user_preferences(user_id)
+                target_language = preferences.get('target_language', 'en')
+
+                message_text = update.message.text
+                self.logger.info(f"Received direct message: {message_text}")
+
+                # Detect source language first
+                self.logger.info("Attempting to detect language for message")
+                detected_lang = self.translator.detect_language(message_text)
+                self.logger.info(f"Detected language: {detected_lang}")
+
+                if detected_lang and detected_lang != target_language:
+                    self.logger.info(f"Translating from {detected_lang} to {target_language}")
+                    translated_text = self.translator.translate_text(
+                        message_text,
+                        target_lang=target_language,
+                        source_lang=detected_lang
+                    )
+
+                    if translated_text and translated_text != message_text:
+                        await update.message.reply_text(
+                            f"🔄 Dịch / Translation:\n"
+                            f"({detected_lang} ➜ {target_language})\n\n"
+                            f"{message_text}\n"
+                            f"➜ {translated_text}"
+                        )
+                    else:
+                        self.logger.warning("Translation failed or returned same text")
 
         except Exception as e:
             self.logger.error(f"Error in message handler: {str(e)}")

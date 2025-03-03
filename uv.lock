@@ -174,7 +174,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "googletrans", specifier = ">=4.0.2" },
-    { name = "googletrans-py", specifier = ">=4.0.0" },
+    { name = "googletrans-py", specifier = "==4.0.0" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "python-telegram-bot", specifier = ">=20.0" },

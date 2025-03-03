@@ -24,7 +24,7 @@ def retry_on_error(retries=3, delay=1):
 
 class TranslationService:
     def __init__(self):
-        self.translator = Translator(service_urls=['translate.google.com'])
+        self.translator = Translator()
         self.logger = logging.getLogger(__name__)
 
     def _is_valid_language(self, lang_code: str) -> bool:
