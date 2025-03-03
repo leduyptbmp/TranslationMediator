@@ -28,8 +28,7 @@ class CommandHandler:
                 "/subscribe hoặc /sub @channel - Đăng ký kênh / Subscribe to a channel\n"
                 "/unsubscribe hoặc /unsub @channel - Hủy đăng ký / Unsubscribe from a channel\n"
                 "/list - Xem các kênh đã đăng ký / Show your subscribed channels\n"
-                "/settings - Cài đặt dịch thuật / View and change translation settings\n"
-                "/set_language [code] - Đổi ngôn ngữ đích (vd: /set_language vi) / Change target language\n"
+                "/settings - Cài đặt dịch thuật và ngôn ngữ / View and change translation settings\n"
                 "/help - Hiện thông tin trợ giúp / Show this help message"
             )
             await update.message.reply_text(welcome_message)
@@ -56,17 +55,17 @@ class CommandHandler:
 
             if not context.args:
                 self.logger.info("Subscribe command received without channel ID")
+                # Create a text input field
                 await update.message.reply_text(
-                    "ℹ️ Có 2 cách để đăng ký kênh:\n\n"
-                    "1️⃣ Forward tin nhắn từ kênh và nhấn nút 'Đăng ký'\n"
-                    "2️⃣ Sử dụng lệnh /sub hoặc /subscribe:\n"
-                    "   /sub @tenkênh\n"
-                    "   /subscribe @tenkênh\n\n"
-                    "There are 2 ways to subscribe:\n\n"
-                    "1️⃣ Forward a message from the channel and click 'Subscribe'\n"
-                    "2️⃣ Use /sub or /subscribe command:\n"
-                    "   /sub @channelname\n"
-                    "   /subscribe @channelname"
+                    "📝 Hãy nhập ID kênh bạn muốn đăng ký:\n"
+                    "- @tenkênh cho kênh công khai\n"
+                    "- -100xxx cho kênh riêng tư\n\n"
+                    "Please enter the channel ID to subscribe:\n"
+                    "- @channelname for public channels\n"
+                    "- -100xxx for private channels",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("❓ Hướng dẫn / Help", callback_data="subscribe_help")]
+                    ])
                 )
                 return
 
@@ -289,6 +288,29 @@ class CommandHandler:
 
                     # Check if already subscribed
                     if channel_id in self.storage.get_subscribed_channels(user_id):
+                        # Get message text
+                        message_text = update.message.text or update.message.caption or ""
+                        
+                        # If there's text, translate it immediately for convenience
+                        if message_text:
+                            detected_lang = self.translator.detect_language(message_text)
+                            if detected_lang:
+                                preferences = self.storage.get_user_preferences(user_id)
+                                target_language = preferences.get('target_language', 'en')
+                                if detected_lang != target_language:
+                                    translated_text = self.translator.translate_text(
+                                        message_text,
+                                        target_lang=target_language,
+                                        source_lang=detected_lang
+                                    )
+                                    if translated_text and translated_text != message_text:
+                                        await update.message.reply_text(
+                                            f"🔄 Dịch / Translation:\n"
+                                            f"({detected_lang} ➜ {target_language})\n\n"
+                                            f"{translated_text}"
+                                        )
+                                        return
+                        
                         await update.message.reply_text(
                             f"ℹ️ Bạn đã đăng ký kênh/bot này rồi\n"
                             f"You are already subscribed to this channel/bot"
@@ -296,12 +318,20 @@ class CommandHandler:
                         return
 
                     # Create subscription button
-                    keyboard = [[
-                        InlineKeyboardButton(
-                            "✅ Đăng ký / Subscribe",
-                            callback_data=f"subscribe:{channel_id}"
-                        )
-                    ]]
+                    keyboard = [
+                        [
+                            InlineKeyboardButton(
+                                "✅ Đăng ký / Subscribe",
+                                callback_data=f"subscribe:{channel_id}"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "📝 Dịch tin nhắn này / Translate this message",
+                                callback_data=f"translate_only"
+                            )
+                        ]
+                    ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
 
                     title = forward_from.title or forward_from.first_name or channel_id
@@ -346,8 +376,7 @@ class CommandHandler:
                                     f"📢 Tin nhắn từ kênh {update.channel_post.chat.title} ({channel_id}):\n\n"
                                     f"🔄 Dịch / Translation:\n"
                                     f"({detected_lang} ➜ {target_language})\n\n"
-                                    f"{message_text}\n"
-                                    f"➜ {translated_text}"
+                                    f"{translated_text}"
                                 )
                                 try:
                                     await context.bot.send_message(
@@ -389,8 +418,7 @@ class CommandHandler:
                         await update.message.reply_text(
                             f"🔄 Dịch / Translation:\n"
                             f"({detected_lang} ➜ {target_language})\n\n"
-                            f"{message_text}\n"
-                            f"➜ {translated_text}"
+                            f"{translated_text}"
                         )
                     else:
                         self.logger.warning("Translation failed or returned same text")
@@ -521,3 +549,98 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in language button handler: {str(e)}")
             await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
+            
+    async def handle_subscribe_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            help_message = (
+                "ℹ️ Để đăng ký kênh, bạn có thể:\n\n"
+                "1️⃣ Forward tin nhắn từ kênh và nhấn nút 'Đăng ký'\n"
+                "2️⃣ Sử dụng lệnh: /sub @tenkênh hoặc /subscribe @tenkênh\n"
+                "3️⃣ Dùng ID riêng tư: /sub -100xxx (cho kênh riêng tư)\n\n"
+                "How to subscribe to a channel:\n\n"
+                "1️⃣ Forward a message from the channel and click 'Subscribe'\n"
+                "2️⃣ Use command: /sub @channelname or /subscribe @channelname\n"
+                "3️⃣ Use private ID: /sub -100xxx (for private channels)"
+            )
+            
+            await query.edit_message_text(
+                help_message,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Quay lại / Back", callback_data="back_to_sub")]
+                ])
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error in subscribe help handler: {str(e)}")
+            await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
+    
+    async def handle_back_to_sub(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            await query.edit_message_text(
+                "📝 Hãy nhập ID kênh bạn muốn đăng ký:\n"
+                "- @tenkênh cho kênh công khai\n"
+                "- -100xxx cho kênh riêng tư\n\n"
+                "Please enter the channel ID to subscribe:\n"
+                "- @channelname for public channels\n"
+                "- -100xxx for private channels",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("❓ Hướng dẫn / Help", callback_data="subscribe_help")]
+                ])
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error in back to subscribe handler: {str(e)}")
+            await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
+    
+    async def handle_translate_only(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            query = update.callback_query
+            await query.answer()
+            
+            # Get the original message
+            original_message = query.message.reply_to_message
+            if not original_message:
+                await query.edit_message_text("❌ Không tìm thấy tin nhắn gốc / Original message not found")
+                return
+                
+            message_text = original_message.text or original_message.caption
+            if not message_text:
+                await query.edit_message_text("❌ Tin nhắn không có nội dung văn bản / Message has no text content")
+                return
+                
+            user_id = query.from_user.id
+            preferences = self.storage.get_user_preferences(user_id)
+            target_language = preferences.get('target_language', 'en')
+            
+            # Translate the message
+            detected_lang = self.translator.detect_language(message_text)
+            if detected_lang and detected_lang != target_language:
+                translated_text = self.translator.translate_text(
+                    message_text,
+                    target_lang=target_language,
+                    source_lang=detected_lang
+                )
+                
+                if translated_text and translated_text != message_text:
+                    await query.edit_message_text(
+                        f"🔄 Dịch / Translation:\n"
+                        f"({detected_lang} ➜ {target_language})\n\n"
+                        f"{translated_text}"
+                    )
+                else:
+                    await query.edit_message_text("❌ Không thể dịch tin nhắn này / Could not translate message")
+            else:
+                await query.edit_message_text(
+                    f"⚠️ Không cần dịch - đã là ngôn ngữ {target_language}\n"
+                    f"No translation needed - already in {target_language}"
+                )
+                
+        except Exception as e:
+            self.logger.error(f"Error in translate only handler: {str(e)}")
+            await query.edit_message_text("❌ Có lỗi xảy ra khi dịch / An error occurred while translating")

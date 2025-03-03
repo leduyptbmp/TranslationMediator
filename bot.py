@@ -34,7 +34,6 @@ async def main():
         application.add_handler(CommandHandler("unsub", handler.unsubscribe))  # Short version
         application.add_handler(CommandHandler("list", handler.list_subscriptions))
         application.add_handler(CommandHandler("settings", handler.settings))
-        application.add_handler(CommandHandler("set_language", handler.set_language))
         logger.info("Command handlers registered successfully")
 
         # Register message handler for both private messages and channel posts
@@ -58,6 +57,18 @@ async def main():
         application.add_handler(CallbackQueryHandler(
             handler.handle_language_button,
             pattern="^setlang:"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_subscribe_help,
+            pattern="^subscribe_help$"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_back_to_sub,
+            pattern="^back_to_sub$"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_translate_only,
+            pattern="^translate_only$"
         ))
         logger.info("Callback query handlers registered successfully")
 
