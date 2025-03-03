@@ -268,12 +268,17 @@ class CommandHandler:
             # Handle forwarded channel messages for easy subscription
             if update.message:
                 forward_from = None
+                is_forwarded = False
+                
                 if hasattr(update.message, 'forward_from_chat'):
                     forward_from = update.message.forward_from_chat
+                    is_forwarded = True
                 elif hasattr(update.message, 'forward_from'):
                     forward_from = update.message.forward_from
-                elif hasattr(update.message, 'forward_from_message_id'):
+                    is_forwarded = True
+                elif hasattr(update.message, 'forward_from_message_id') and update.message.forward_from_message_id:
                     # Handle messages forwarded from private groups
+                    is_forwarded = True
                     await update.message.reply_text(
                         "⚠️ Không thể đăng ký tin nhắn từ nhóm riêng tư.\n"
                         "Vui lòng thêm bot vào nhóm để sử dụng.\n\n"
@@ -282,16 +287,16 @@ class CommandHandler:
                     )
                     return
 
-                if forward_from and forward_from.type in ['channel', 'supergroup', 'bot']:
+                if is_forwarded and forward_from and forward_from.type in ['channel', 'supergroup', 'bot']:
                     channel_id = str(forward_from.id)
                     user_id = update.effective_user.id
+                    
+                    # Get message text or caption (for messages with images)
+                    message_text = update.message.text or update.message.caption or ""
 
                     # Check if already subscribed
                     if channel_id in self.storage.get_subscribed_channels(user_id):
-                        # Get message text
-                        message_text = update.message.text or update.message.caption or ""
-                        
-                        # If there's text, translate it immediately for convenience
+                        # If there's text or caption, translate it immediately for convenience
                         if message_text:
                             detected_lang = self.translator.detect_language(message_text)
                             if detected_lang:
@@ -316,31 +321,35 @@ class CommandHandler:
                             f"You are already subscribed to this channel/bot"
                         )
                         return
-
-                    # Create subscription button
-                    keyboard = [
-                        [
-                            InlineKeyboardButton(
-                                "✅ Đăng ký / Subscribe",
-                                callback_data=f"subscribe:{channel_id}"
-                            )
-                        ],
-                        [
-                            InlineKeyboardButton(
-                                "📝 Dịch tin nhắn này / Translate this message",
-                                callback_data=f"translate_only"
-                            )
+                    else:
+                        # Create subscription button
+                        keyboard = [
+                            [
+                                InlineKeyboardButton(
+                                    "✅ Đăng ký / Subscribe",
+                                    callback_data=f"subscribe:{channel_id}"
+                                )
+                            ]
                         ]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
+                        
+                        # Add translate button if there's text to translate
+                        if message_text:
+                            keyboard.append([
+                                InlineKeyboardButton(
+                                    "📝 Dịch tin nhắn này / Translate this message",
+                                    callback_data=f"translate_only"
+                                )
+                            ])
+                        
+                        reply_markup = InlineKeyboardMarkup(keyboard)
 
-                    title = forward_from.title or forward_from.first_name or channel_id
-                    await update.message.reply_text(
-                        f"🔔 Bạn có muốn đăng ký nhận tin nhắn được dịch từ {title}?\n"
-                        f"Would you like to subscribe to translated messages from {title}?",
-                        reply_markup=reply_markup
-                    )
-                    return
+                        title = forward_from.title or forward_from.first_name or channel_id
+                        await update.message.reply_text(
+                            f"🔔 Bạn có muốn đăng ký nhận tin nhắn được dịch từ {title}?\n"
+                            f"Would you like to subscribe to translated messages from {title}?",
+                            reply_markup=reply_markup
+                        )
+                        return
 
             # Handle channel posts
             if update.channel_post:
@@ -609,6 +618,7 @@ class CommandHandler:
                 await query.edit_message_text("❌ Không tìm thấy tin nhắn gốc / Original message not found")
                 return
                 
+            # Check for text or caption (for images)
             message_text = original_message.text or original_message.caption
             if not message_text:
                 await query.edit_message_text("❌ Tin nhắn không có nội dung văn bản / Message has no text content")
@@ -628,10 +638,18 @@ class CommandHandler:
                 )
                 
                 if translated_text and translated_text != message_text:
+                    # Check if message has media
+                    has_media = bool(original_message.photo or original_message.video or 
+                                    original_message.document or original_message.animation)
+                    
+                    media_info = ""
+                    if has_media:
+                        media_info = "📎 [Có đính kèm phương tiện / Contains media]\n\n"
+                        
                     await query.edit_message_text(
                         f"🔄 Dịch / Translation:\n"
                         f"({detected_lang} ➜ {target_language})\n\n"
-                        f"{translated_text}"
+                        f"{media_info}{translated_text}"
                     )
                 else:
                     await query.edit_message_text("❌ Không thể dịch tin nhắn này / Could not translate message")
