@@ -1,6 +1,6 @@
 import logging
 import nest_asyncio
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from config import TOKEN
 from handlers import CommandHandler as BotCommandHandler
 from utils import setup_logging
@@ -29,16 +29,37 @@ async def main():
         application.add_handler(CommandHandler("start", handler.start))
         application.add_handler(CommandHandler("help", handler.help))
         application.add_handler(CommandHandler("subscribe", handler.subscribe))
+        application.add_handler(CommandHandler("sub", handler.subscribe))  # Short version
         application.add_handler(CommandHandler("unsubscribe", handler.unsubscribe))
+        application.add_handler(CommandHandler("unsub", handler.unsubscribe))  # Short version
         application.add_handler(CommandHandler("list", handler.list_subscriptions))
         application.add_handler(CommandHandler("settings", handler.settings))
         application.add_handler(CommandHandler("set_language", handler.set_language))
         logger.info("Command handlers registered successfully")
 
-        # Register message handler
-        logger.info("Registering message handler...")
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler.handle_message))
-        logger.info("Message handler registered successfully")
+        # Register message handler for both private messages and channel posts
+        logger.info("Registering message handlers...")
+        application.add_handler(MessageHandler(
+            (filters.TEXT & ~filters.COMMAND) | filters.ChatType.CHANNEL,
+            handler.handle_message
+        ))
+        logger.info("Message handlers registered successfully")
+
+        # Register callback query handlers
+        logger.info("Registering callback query handlers...")
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_subscribe_button,
+            pattern="^subscribe:"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_unsubscribe_button,
+            pattern="^unsubscribe:"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            handler.handle_language_button,
+            pattern="^setlang:"
+        ))
+        logger.info("Callback query handlers registered successfully")
 
         # Start the bot
         logger.info("Starting bot polling...")
