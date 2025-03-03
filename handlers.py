@@ -101,13 +101,15 @@ class CommandHandler:
             target_language = preferences.get('target_language', 'en')
 
             message_text = update.message.text
-            self.logger.info(f"Received message: {message_text[:50]}...")  # Log first 50 chars
+            self.logger.info(f"Received message: {message_text}")  # Log full message for debugging
 
             # Detect source language first
+            self.logger.info("Attempting to detect language for message")
             detected_lang = self.translator.detect_language(message_text)
             self.logger.info(f"Detected language: {detected_lang}")
 
             if detected_lang and detected_lang != target_language:
+                self.logger.info(f"Translating from {detected_lang} to {target_language}")
                 translated_text = self.translator.translate_text(
                     message_text,
                     target_lang=target_language,
@@ -121,6 +123,8 @@ class CommandHandler:
                         f"{message_text}\n"
                         f"➜ {translated_text}"
                     )
+                else:
+                    self.logger.warning("Translation failed or returned same text")
 
         except Exception as e:
             self.logger.error(f"Error in message handler: {str(e)}")
