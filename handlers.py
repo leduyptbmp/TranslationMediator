@@ -269,7 +269,7 @@ class CommandHandler:
             if update.message:
                 forward_from = None
                 is_forwarded = False
-                
+
                 if hasattr(update.message, 'forward_from_chat'):
                     forward_from = update.message.forward_from_chat
                     is_forwarded = True
@@ -290,7 +290,7 @@ class CommandHandler:
                 if is_forwarded and forward_from and forward_from.type in ['channel', 'supergroup', 'bot']:
                     channel_id = str(forward_from.id)
                     user_id = update.effective_user.id
-                    
+
                     # Get message text or caption (for messages with images)
                     message_text = update.message.text or update.message.caption or ""
 
@@ -315,7 +315,7 @@ class CommandHandler:
                                             f"{translated_text}"
                                         )
                                         return
-                        
+
                         await update.message.reply_text(
                             f"ℹ️ Bạn đã đăng ký kênh/bot này rồi\n"
                             f"You are already subscribed to this channel/bot"
@@ -331,7 +331,7 @@ class CommandHandler:
                                 )
                             ]
                         ]
-                        
+
                         # Add translate button if there's text to translate
                         if message_text:
                             keyboard.append([
@@ -340,7 +340,7 @@ class CommandHandler:
                                     callback_data=f"translate_only"
                                 )
                             ])
-                        
+
                         reply_markup = InlineKeyboardMarkup(keyboard)
 
                         title = forward_from.title or forward_from.first_name or channel_id
@@ -444,7 +444,7 @@ class CommandHandler:
         try:
             user_id = update.effective_user.id
             preferences = self.storage.get_user_preferences(user_id)
-            
+
             # Language code to full name mapping
             language_names = {
                 'vi': '🇻🇳 Tiếng Việt',
@@ -469,7 +469,7 @@ class CommandHandler:
                 ]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            
+
             # Get current language code and display full name
             current_lang_code = preferences.get('target_language', 'en')
             current_lang_name = language_names.get(current_lang_code, current_lang_code)
@@ -557,7 +557,7 @@ class CommandHandler:
                     "❌ Mã ngôn ngữ không hợp lệ / Invalid language code"
                 )
                 return
-                
+
             # Language code to full name mapping
             language_names = {
                 'vi': '🇻🇳 Tiếng Việt',
@@ -566,7 +566,7 @@ class CommandHandler:
                 'ko': '🇰🇷 한국어',
                 'zh': '🇨🇳 中文'
             }
-            
+
             # Get full language name
             language_name = language_names.get(new_language, new_language)
 
@@ -583,12 +583,12 @@ class CommandHandler:
         except Exception as e:
             self.logger.error(f"Error in language button handler: {str(e)}")
             await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
-            
+
     async def handle_subscribe_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             query = update.callback_query
             await query.answer()
-            
+
             help_message = (
                 "ℹ️ Để đăng ký kênh, bạn có thể:\n\n"
                 "1️⃣ Forward tin nhắn từ kênh và nhấn nút 'Đăng ký'\n"
@@ -599,23 +599,23 @@ class CommandHandler:
                 "2️⃣ Use command: /sub @channelname or /subscribe @channelname\n"
                 "3️⃣ Use private ID: /sub -100xxx (for private channels)"
             )
-            
+
             await query.edit_message_text(
                 help_message,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔙 Quay lại / Back", callback_data="back_to_sub")]
                 ])
             )
-            
+
         except Exception as e:
             self.logger.error(f"Error in subscribe help handler: {str(e)}")
             await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
-    
+
     async def handle_back_to_sub(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             query = update.callback_query
             await query.answer()
-            
+
             await query.edit_message_text(
                 "📝 Hãy nhập ID kênh bạn muốn đăng ký:\n"
                 "- @tenkênh cho kênh công khai\n"
@@ -627,32 +627,32 @@ class CommandHandler:
                     [InlineKeyboardButton("❓ Hướng dẫn / Help", callback_data="subscribe_help")]
                 ])
             )
-            
+
         except Exception as e:
             self.logger.error(f"Error in back to subscribe handler: {str(e)}")
             await query.edit_message_text("❌ Có lỗi xảy ra / An error occurred")
-    
+
     async def handle_translate_only(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             query = update.callback_query
             await query.answer()
-            
+
             # Get the original message
             original_message = query.message.reply_to_message
             if not original_message:
                 await query.edit_message_text("❌ Không tìm thấy tin nhắn gốc / Original message not found")
                 return
-                
+
             # Check for text or caption (for images)
             message_text = original_message.text or original_message.caption
             if not message_text:
                 await query.edit_message_text("❌ Tin nhắn không có nội dung văn bản / Message has no text content")
                 return
-                
+
             user_id = query.from_user.id
             preferences = self.storage.get_user_preferences(user_id)
             target_language = preferences.get('target_language', 'en')
-            
+
             # Translate the message
             detected_lang = self.translator.detect_language(message_text)
             if detected_lang and detected_lang != target_language:
@@ -661,16 +661,16 @@ class CommandHandler:
                     target_lang=target_language,
                     source_lang=detected_lang
                 )
-                
+
                 if translated_text and translated_text != message_text:
                     # Check if message has media
                     has_media = bool(original_message.photo or original_message.video or 
                                     original_message.document or original_message.animation)
-                    
+
                     media_info = ""
                     if has_media:
                         media_info = "📎 [Có đính kèm phương tiện / Contains media]\n\n"
-                        
+
                     await query.edit_message_text(
                         f"🔄 Dịch / Translation:\n"
                         f"({detected_lang} ➜ {target_language})\n\n"
@@ -683,7 +683,7 @@ class CommandHandler:
                     f"⚠️ Không cần dịch - đã là ngôn ngữ {target_language}\n"
                     f"No translation needed - already in {target_language}"
                 )
-                
+
         except Exception as e:
             self.logger.error(f"Error in translate only handler: {str(e)}")
             await query.edit_message_text("❌ Có lỗi xảy ra khi dịch / An error occurred while translating")
