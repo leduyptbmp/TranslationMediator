@@ -79,4 +79,4 @@ async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE,
         else:
             logging.error(f"Could not send error message: no effective message")
     except Exception as e:
-        logging.error(f"Failed to send error message: {str(e)}"))}")
+        logging.error(f"Failed to send error message: {str(e)}")
