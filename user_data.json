@@ -1,7 +1,10 @@
 {
     "7901097354": {
         "target_language": "vi",
-        "subscribed_channels": [],
+        "subscribed_channels": [
+            "@cryptosignals",
+            "@lobsters_chat"
+        ],
         "notifications_enabled": true
     }
 }
