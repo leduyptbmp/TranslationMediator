@@ -294,34 +294,42 @@ class CommandHandler:
                     source_title = "Unknown"
                     
                     # Handle different types of forwarded messages
+                    self.logger.info(f"Processing forwarded message. forward_from: {bool(forward_from)}, forward_from_chat: {hasattr(update.message, 'forward_from_chat')}")
+                    
                     if forward_from:
                         # From user, bot, or public channel
                         source_id = str(forward_from.id)
                         source_title = forward_from.title or forward_from.first_name or forward_from.username or "Unknown"
+                        self.logger.info(f"Forwarded from user/bot/channel: ID={source_id}, Title={source_title}")
                     elif hasattr(update.message, 'forward_from_chat') and update.message.forward_from_chat:
                         # From channel or group
                         source_id = str(update.message.forward_from_chat.id)
                         source_title = update.message.forward_from_chat.title or "Unknown Channel"
+                        self.logger.info(f"Forwarded from chat: ID={source_id}, Title={source_title}")
                     elif hasattr(update.message, 'forward_sender_name') and update.message.forward_sender_name:
                         # From a user who has hidden their identity
                         source_title = update.message.forward_sender_name
                         # Generate a consistent ID based on the name
                         import hashlib
                         source_id = "fwd_" + hashlib.md5(source_title.encode()).hexdigest()[:10]
+                        self.logger.info(f"Forwarded from hidden user: Name={source_title}, Generated ID={source_id}")
                     
-                    # If we couldn't get a proper ID, we can't subscribe
+                    # If we couldn't get a proper ID, we still want to show a subscribe button if possible
                     if not source_id:
-                        self.logger.info("Couldn't identify source for forwarded message")
-                        # Still translate the message if possible
-                        message_text = update.message.text or update.message.caption or ""
-                        if message_text:
-                            await self._translate_and_respond(update, message_text)
-                        return
+                        self.logger.info("Couldn't identify exact source for forwarded message, using fallback ID")
+                        # Generate a fallback ID based on available information
+                        import hashlib
+                        fallback_info = str(update.message.message_id) + str(update.message.date)
+                        source_id = "fwd_" + hashlib.md5(fallback_info.encode()).hexdigest()[:10]
+                        source_title = "Forwarded Content"
                     
                     user_id = update.effective_user.id
                     # Get message text or caption (for messages with images)
                     message_text = update.message.text or update.message.caption or ""
 
+                    # Get message text or caption (for messages with images)
+                    message_text = update.message.text or update.message.caption or ""
+                    
                     # Check if already subscribed
                     if source_id in self.storage.get_subscribed_channels(user_id):
                         # If there's text or caption, translate it immediately for convenience
@@ -350,7 +358,9 @@ class CommandHandler:
                         )
                         return
                     else:
-                        # Create subscription button
+                        # Always create a subscription button for any forwarded content
+                        self.logger.info(f"Creating subscription button for source: {source_id}, {source_title}")
+                        
                         keyboard = [
                             [
                                 InlineKeyboardButton(
