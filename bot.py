@@ -1,5 +1,8 @@
 import logging
 import nest_asyncio
+import os
+import signal
+import sys
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from config import TOKEN
 from handlers import CommandHandler as BotCommandHandler
@@ -16,7 +19,7 @@ async def main():
 
     # Initialize keep-alive mechanism
     keep_alive()
-    
+
     # Add immediate log messages to verify logging is working
     logger.info("=== Bot Starting ===")
     logger.info("Initializing Telegram bot...")
@@ -78,8 +81,30 @@ async def main():
 
         # Start the bot
         logger.info("Starting bot polling...")
-        await application.run_polling()
-        logger.info("Bot polling started successfully")
+
+        # Set up signal handlers for graceful shutdown
+        PID_FILE = "/tmp/my_bot.pid" # Assuming a PID file location
+
+        def signal_handler(sig, frame):
+            logger.info("Received shutdown signal, cleaning up...")
+            # Remove PID file
+            if os.path.exists(PID_FILE):
+                os.remove(PID_FILE)
+            logger.info("Cleanup complete, exiting")
+            sys.exit(0)
+
+        # Register signal handlers
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
+        try:
+            application.run_polling(drop_pending_updates=True)
+        except Exception as e:
+            logger.error(f"Error in polling: {e}")
+        finally:
+            # Always clean up PID file
+            if os.path.exists(PID_FILE):
+                os.remove(PID_FILE)
 
     except Exception as e:
         logger.error(f"Error starting bot: {str(e)}")
@@ -87,4 +112,9 @@ async def main():
 
 if __name__ == '__main__':
     import asyncio
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped by user")
+    except Exception as e:
+        print(f"Bot stopped due to error: {e}")
