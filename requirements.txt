@@ -1,0 +1,8 @@
+
+googletrans>=4.0.2
+googletrans-py==4.0.0
+nest-asyncio>=1.6.0
+python-dotenv>=1.0.1
+python-telegram-bot>=20.0
+telegram>=0.0.1
+trafilatura>=2.0.0
