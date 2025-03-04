@@ -74,6 +74,9 @@ def validate_channel_id(channel_id: str) -> bool:
 
 async def send_error_message(update: Update, context: ContextTypes.DEFAULT_TYPE, message: str):
     try:
-        await update.message.reply_text(f"⚠️ Error: {message}")
+        if update.effective_message:
+            await update.effective_message.reply_text(f"⚠️ Error: {message}")
+        else:
+            logging.error(f"Could not send error message: no effective message")
     except Exception as e:
-        logging.error(f"Failed to send error message: {str(e)}")
+        logging.error(f"Failed to send error message: {str(e)}"))}")

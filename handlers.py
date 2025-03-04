@@ -272,7 +272,7 @@ class CommandHandler:
             user_id = update.effective_user.id
 
             # Handle forwarded messages from channels or groups
-            if message.forward_from_chat:
+            if hasattr(message, 'forward_from_chat') and message.forward_from_chat:
                 try:
                     source_id = str(message.forward_from_chat.id)
                     source_title = message.forward_from_chat.title
