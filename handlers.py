@@ -265,134 +265,99 @@ class CommandHandler:
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
-            # Handle forwarded messages
-            if update.message and (update.message.forward_from_chat or update.message.forward_from):
-                # Get the forwarded source identifier
-                source_id = None
-                source_title = None
-
-                if update.message.forward_from_chat:
-                    # Handle forwards from channels
-                    source_id = str(update.message.forward_from_chat.id)
-                    source_title = update.message.forward_from_chat.title
-                    self.logger.info(f"Forwarded from channel: {source_title} ({source_id})")
-                elif update.message.forward_from:
-                    # Handle forwards from users/bots
-                    source_id = str(update.message.forward_from.id)
-                    source_title = (
-                        update.message.forward_from.first_name or 
-                        update.message.forward_from.title or 
-                        update.message.forward_from.username
-                    )
-                    self.logger.info(f"Forwarded from user/bot: {source_title} ({source_id})")
-
-                if not source_id:
-                    self.logger.warning("Could not identify source of forwarded message")
-                    return
-
-                user_id = update.effective_user.id
-                message_text = update.message.text or update.message.caption or ""
-
-                # Check if already subscribed
-                if source_id in self.storage.get_subscribed_channels(user_id):
-                    # If text exists, translate it
-                    if message_text:
-                        detected_lang = self.translator.detect_language(message_text)
-                        if detected_lang:
-                            preferences = self.storage.get_user_preferences(user_id)
-                            target_language = preferences.get('target_language', 'en')
-                            if detected_lang != target_language:
-                                translated_text = self.translator.translate_text(
-                                    message_text,
-                                    target_lang=target_language,
-                                    source_lang=detected_lang
-                                )
-                                if translated_text and translated_text != message_text:
-                                    await update.message.reply_text(
-                                        f"🔄 {detected_lang} ➜ {target_language}:\n\n"
-                                        f"{translated_text}"
-                                    )
-                    return
-
-                # Create subscription keyboard
-                keyboard = [
-                    [InlineKeyboardButton(
-                        "✅ Đăng ký / Subscribe",
-                        callback_data=f"subscribe:{source_id}"
-                    )]
-                ]
-
-                # Add translate button if there's text
-                if message_text:
-                    keyboard.append([
-                        InlineKeyboardButton(
-                            "📝 Dịch tin nhắn này / Translate this message",
-                            callback_data="translate_only"
-                        )
-                    ])
-
-                reply_markup = InlineKeyboardMarkup(keyboard)
-
-                # Show subscription prompt
-                await update.message.reply_text(
-                    f"🔔 Bạn có muốn đăng ký nhận tin nhắn được dịch từ {source_title}?\n"
-                    f"Would you like to subscribe to translated messages from {source_title}?",
-                    reply_markup=reply_markup
-                )
+            if not update.effective_message:
                 return
 
+            message = update.effective_message
+            user_id = update.effective_user.id
+
+            # Handle forwarded messages from channels or groups
+            if message.forward_from_chat and message.forward_from_chat.type in ['channel', 'group']:
+                source_id = str(message.forward_from_chat.id)
+                source_title = message.forward_from_chat.title
+                message_text = message.text or message.caption or ""
+
+                self.logger.info(
+                    f"Forward details - Chat ID: {source_id}, "
+                    f"Title: {source_title}, "
+                    f"Type: {message.forward_from_chat.type}, "
+                    f"Has text: {bool(message_text)}, "
+                    f"User: {user_id}"
+                )
+
+                # Check if already subscribed
+                is_subscribed = source_id in self.storage.get_subscribed_channels(user_id)
+                self.logger.info(f"User {user_id} subscription status for {source_id}: {is_subscribed}")
+
+                if not is_subscribed:
+                    # Create subscription keyboard
+                    keyboard = [
+                        [InlineKeyboardButton(
+                            "✅ Đăng ký / Subscribe",
+                            callback_data=f"subscribe:{source_id}"
+                        )]
+                    ]
+
+                    # Add translate button if there's text
+                    if message_text:
+                        keyboard.append([
+                            InlineKeyboardButton(
+                                "📝 Dịch tin nhắn này / Translate this message",
+                                callback_data="translate_only"
+                            )
+                        ])
+
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+
+                    try:
+                        # Show subscription prompt
+                        await message.reply_text(
+                            f"🔔 Bạn có muốn đăng ký nhận tin nhắn được dịch từ {source_title}?\n"
+                            f"Would you like to subscribe to translated messages from {source_title}?",
+                            reply_markup=reply_markup
+                        )
+                        self.logger.info(f"Showed subscription prompt for channel {source_id}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to show subscription prompt: {str(e)}")
+                        await send_error_message(update, context, "❌ Có lỗi xảy ra / An error occurred")
+                else:
+                    # If already subscribed and has text, translate immediately
+                    if message_text:
+                        try:
+                            detected_lang = self.translator.detect_language(message_text)
+                            if detected_lang:
+                                preferences = self.storage.get_user_preferences(user_id)
+                                target_language = preferences.get('target_language', 'en')
+                                if detected_lang != target_language:
+                                    translated_text = self.translator.translate_text(
+                                        message_text,
+                                        target_lang=target_language,
+                                        source_lang=detected_lang
+                                    )
+                                    if translated_text and translated_text != message_text:
+                                        await message.reply_text(
+                                            f"🔄 {detected_lang} ➜ {target_language}:\n\n"
+                                            f"{translated_text}"
+                                        )
+                                        self.logger.info(f"Translated forwarded message for subscribed user {user_id}")
+                        except Exception as e:
+                            self.logger.error(f"Failed to translate forwarded message: {str(e)}")
+                            await send_error_message(update, context, "❌ Có lỗi xảy ra khi dịch / Translation error")
+
             # Handle direct messages
-            elif update.message and update.message.text:
-                user_id = update.effective_user.id
+            elif message.text and not message.forward_from_chat:
                 if not await self.rate_limiter.check_rate_limit(user_id):
                     self.logger.warning(f"Rate limit exceeded for user {user_id}")
                     return
 
                 preferences = self.storage.get_user_preferences(user_id)
                 target_language = preferences.get('target_language', 'en')
-                message_text = update.message.text
+                message_text = message.text
 
-                detected_lang = self.translator.detect_language(message_text)
-                if detected_lang and detected_lang != target_language:
-                    translated_text = self.translator.translate_text(
-                        message_text,
-                        target_lang=target_language,
-                        source_lang=detected_lang
-                    )
-
-                    if translated_text and translated_text != message_text:
-                        await update.message.reply_text(
-                            f"🔄 {detected_lang} ➜ {target_language}:\n\n"
-                            f"{translated_text}"
-                        )
-
-            # Handle channel posts
-            if update.channel_post:
-                channel_id = str(update.channel_post.chat.id)
-                message_text = update.channel_post.text or update.channel_post.caption
-
-                if not message_text:
-                    self.logger.info(f"Skipping message without text/caption from channel {channel_id}")
-                    return
-
-                # Get all users subscribed to this channel
-                subscribed_users = [
-                    user_id for user_id, prefs in self.storage.user_data.items()
-                    if channel_id in prefs.get('subscribed_channels', [])
-                ]
-
-                if not subscribed_users:
-                    self.logger.info(f"No subscribers for channel {channel_id}")
-                    return
-
-                channel_title = update.channel_post.chat.title or channel_id
-
-                for user_id in subscribed_users:
-                    preferences = self.storage.get_user_preferences(int(user_id))
-                    target_language = preferences.get('target_language', 'en')
-
-                    # Detect and translate
+                try:
                     detected_lang = self.translator.detect_language(message_text)
+                    self.logger.info(f"Direct message - Source lang: {detected_lang}, Target lang: {target_language}")
+
                     if detected_lang and detected_lang != target_language:
                         translated_text = self.translator.translate_text(
                             message_text,
@@ -401,38 +366,85 @@ class CommandHandler:
                         )
 
                         if translated_text and translated_text != message_text:
-                            # Check for media
-                            has_media = bool(
-                                update.channel_post.photo or 
-                                update.channel_post.video or 
-                                update.channel_post.document or 
-                                update.channel_post.animation
-                            )
-
-                            media_info = "📎 [Có đính kèm phương tiện / Contains media]\n\n" if has_media else ""
-
-                            forward_message = (
-                                f"📢 Tin nhắn từ kênh {channel_title}:\n"
+                            await message.reply_text(
                                 f"🔄 {detected_lang} ➜ {target_language}:\n\n"
-                                f"{media_info}{translated_text}"
+                                f"{translated_text}"
+                            )
+                            self.logger.info("Successfully translated direct message")
+                except Exception as e:
+                    self.logger.error(f"Failed to translate direct message: {str(e)}")
+                    await send_error_message(update, context, "❌ Có lỗi xảy ra khi dịch / Translation error")
+
+            # Handle channel posts
+            if update.channel_post:
+                channel_id = str(update.channel_post.chat.id)
+                message_text = update.channel_post.text or update.channel_post.caption
+                channel_title = update.channel_post.chat.title or channel_id
+
+                if not message_text:
+                    return
+
+                self.logger.info(f"Processing channel post from {channel_title} ({channel_id})")
+
+                # Get all users subscribed to this channel
+                subscribed_users = []
+                for user_id, prefs in self.storage.user_data.items():
+                    if channel_id in prefs.get('subscribed_channels', []):
+                        subscribed_users.append(user_id)
+
+                self.logger.info(f"Found {len(subscribed_users)} subscribers for channel {channel_id}")
+
+                # Process message for each subscribed user
+                for user_id in subscribed_users:
+                    try:
+                        preferences = self.storage.get_user_preferences(int(user_id))
+                        target_language = preferences.get('target_language', 'en')
+
+                        # Detect and translate
+                        detected_lang = self.translator.detect_language(message_text)
+                        self.logger.info(f"Channel post - Source lang: {detected_lang}, Target lang: {target_language}")
+
+                        if detected_lang and detected_lang != target_language:
+                            translated_text = self.translator.translate_text(
+                                message_text,
+                                target_lang=target_language,
+                                source_lang=detected_lang
                             )
 
-                            try:
+                            if translated_text and translated_text != message_text:
+                                # Check for media
+                                has_media = bool(
+                                    update.channel_post.photo or 
+                                    update.channel_post.video or 
+                                    update.channel_post.document or 
+                                    update.channel_post.animation
+                                )
+
+                                media_info = "📎 [Có đính kèm phương tiện / Contains media]\n\n" if has_media else ""
+
+                                forward_message = (
+                                    f"📢 Tin nhắn từ kênh {channel_title}:\n"
+                                    f"🔄 {detected_lang} ➜ {target_language}:\n\n"
+                                    f"{media_info}{translated_text}"
+                                )
+
                                 await context.bot.send_message(
                                     chat_id=int(user_id),
                                     text=forward_message,
                                     disable_web_page_preview=True
                                 )
-                                self.logger.info(f"Sent translation to user {user_id}")
-                            except Exception as e:
-                                self.logger.error(f"Failed to send translation to user {user_id}: {str(e)}")
+                                self.logger.info(f"Successfully sent translation to user {user_id}")
+
+                    except Exception as e:
+                        self.logger.error(f"Error processing message for user {user_id}: {str(e)}")
+                        continue
 
         except Exception as e:
             self.logger.error(f"Error in message handler: {str(e)}")
             await send_error_message(
                 update, 
                 context, 
-                "❌ Xin lỗi, có lỗi xảy ra / Sorry, an error occurred"
+                "❌ Có lỗi xảy ra / An error occurred"
             )
 
     async def settings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
