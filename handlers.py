@@ -354,17 +354,27 @@ class CommandHandler:
             # Handle channel posts
             if update.channel_post:
                 channel_id = str(update.channel_post.chat.id)
-                message_text = update.channel_post.text
+                
+                # Get message text or caption (for media messages)
+                message_text = update.channel_post.text or update.channel_post.caption
+                
+                # Log detailed information about the channel post
+                self.logger.info(f"Received channel post from {channel_id}: Type: {type(update.channel_post).__name__}")
+                self.logger.info(f"Channel message content type: Text: {bool(update.channel_post.text)}, Caption: {bool(update.channel_post.caption)}")
+                self.logger.info(f"Channel message has media: {bool(update.channel_post.photo or update.channel_post.video or update.channel_post.document)}")
 
                 if not message_text:
-                    self.logger.info(f"Skipping non-text message from channel {channel_id}")
+                    self.logger.info(f"Skipping message without text/caption from channel {channel_id}")
                     return
 
-                self.logger.info(f"Received channel message from {channel_id}: {message_text}")
+                self.logger.info(f"Processing channel message from {channel_id}: {message_text[:50]}...")
 
                 # Get all users subscribed to this channel
                 for user_id, preferences in self.storage.user_data.items():
-                    if channel_id in preferences.get('subscribed_channels', []):
+                    subscribed_channels = preferences.get('subscribed_channels', [])
+                    self.logger.info(f"User {user_id} is subscribed to channels: {subscribed_channels}")
+                    
+                    if channel_id in subscribed_channels:
                         target_language = preferences.get('target_language', 'en')
                         self.logger.info(f"Processing message for user {user_id} with target language {target_language}")
 
@@ -381,11 +391,22 @@ class CommandHandler:
                             )
 
                             if translated_text and translated_text != message_text:
+                                # Get channel title or use channel ID if title is not available
+                                channel_title = getattr(update.channel_post.chat, 'title', channel_id)
+                                
+                                # Check if the message has media
+                                has_media = bool(update.channel_post.photo or update.channel_post.video or 
+                                               update.channel_post.document or update.channel_post.animation)
+                                
+                                media_info = ""
+                                if has_media:
+                                    media_info = "📎 [Có đính kèm phương tiện / Contains media]\n\n"
+                                
                                 forward_message = (
-                                    f"📢 Tin nhắn từ kênh {update.channel_post.chat.title} ({channel_id}):\n\n"
+                                    f"📢 Tin nhắn từ kênh {channel_title} ({channel_id}):\n\n"
                                     f"🔄 Dịch / Translation:\n"
                                     f"({detected_lang} ➜ {target_language})\n\n"
-                                    f"{translated_text}"
+                                    f"{media_info}{translated_text}"
                                 )
                                 try:
                                     await context.bot.send_message(
@@ -396,6 +417,12 @@ class CommandHandler:
                                     self.logger.info(f"Successfully sent translated message to user {user_id}")
                                 except Exception as e:
                                     self.logger.error(f"Failed to send translation to user {user_id}: {str(e)}")
+                            else:
+                                self.logger.warning(f"Translation failed or returned same text for channel {channel_id}")
+                        else:
+                            self.logger.info(f"No translation needed for message in channel {channel_id}: already in {target_language}")
+                    else:
+                        self.logger.debug(f"User {user_id} not subscribed to channel {channel_id}")
 
             # Handle direct messages for translation
             if update.message and update.message.text:
